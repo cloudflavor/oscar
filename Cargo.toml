@@ -1,0 +1,20 @@
+[package]
+name = "gitlab-bot"
+authors = ["Victor Palade <victor@cloudflavor.io>"]
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+
+[dependencies]
+http-body-util = "0.1.0"
+hyper = { version = "1.0.1", features = ["server", "http1"] }
+hyper-tls = "0.6.0"
+hyper-util = "0.1.1"
+reqwest = "0.11.22"
+serde = "1.0.193"
+serde_json = "1.0.108"
+structopt = "0.3.26"
+tokio = { version = "1.35.0", features = ["rt-multi-thread", "macros"] }
+toml = "0.8.8"
+tracing = "0.1.40"
+tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
