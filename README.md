@@ -1,2 +1,3 @@
 # oscar
-An automation bot for gitlab miscellaneous tasks
+
+A GitOps automation bot for VCS platforms.
