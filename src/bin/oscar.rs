@@ -6,12 +6,14 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use structopt::StructOpt;
 use tokio::net::TcpListener;
-use tracing::{error, info};
+use tracing::{debug, error, info};
 use tracing_subscriber::EnvFilter;
 
 #[tokio::main]
 async fn main() -> Result<()> {
     let opts = Options::from_args();
+    let op = opts.clone();
+
     let safe_opts = Arc::new(opts.clone());
     let log_level = EnvFilter::new(opts.log_level);
 
@@ -21,6 +23,8 @@ async fn main() -> Result<()> {
         .with_writer(std::io::stdout)
         .finish();
     tracing::subscriber::set_global_default(subscriber)?;
+
+    debug!("Starting with options: {:#?}", &op);
 
     let addr = format!("{}:{}", opts.host, opts.port)
         .parse::<SocketAddr>()

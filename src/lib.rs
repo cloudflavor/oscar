@@ -4,13 +4,12 @@ pub use functions::filter_labels;
 use http_body_util::{BodyExt, Full};
 use hyper::{Method, Request, Response, Uri};
 use reqwest::header::{HeaderMap, HeaderValue};
+use serde::{Deserialize, Serialize};
 use std::convert::Infallible;
 use std::path::PathBuf;
 use std::sync::Arc;
 use structopt::StructOpt;
 use tracing::{debug, error};
-
-use serde::{Deserialize, Serialize};
 
 pub mod functions;
 
@@ -123,8 +122,8 @@ impl LabelerHandler for Labeler {
             .map_err(|e| format!("Failed to parse incoming request body: {e}"))?
             .to_bytes();
 
-        let resp_hook: Webhook =
-            serde_json::from_slice(&data).map_err(|e| format!("Failed to parse webhook: {e}"))?;
+        let resp_hook: Webhook = serde_json::from_slice(&data)
+            .map_err(|e| format!("Failed to  deserialize webhook: {e}"))?;
 
         if !verify_action(&resp_hook.object_attributes) {
             return Ok(());
@@ -137,11 +136,21 @@ impl LabelerHandler for Labeler {
                     opts.gitlab_uri, resp_hook.project.id, resp_hook.object_attributes.iid
                 );
 
-                let resp_changes = req_ext
+                if opts.gitlab_token.is_empty() {
+                    error!("No GitLab token provided, skipping labeler");
+                    return Ok(());
+                }
+
+                let resp = req_ext
                     .do_request(&url, Method::GET, Some(&opts.gitlab_token), None)
-                    .await?
-                    .json::<Changes>()
+                    .await
+                    .map_err(|e| format!("Failed to get changes: {e}"))?
+                    .bytes()
                     .await?;
+
+                let resp_changes = serde_json::from_slice::<Changes>(&resp)
+                    .map_err(|e| format!("Failed to deserialize changes: {e}"))?;
+
                 let config_url = format!(
                     "{}/projects/{}/repository/files/LABELS/raw?ref={}",
                     opts.gitlab_uri, resp_hook.project.id, opts.config_branch
@@ -149,11 +158,15 @@ impl LabelerHandler for Labeler {
 
                 let config_resp = req_ext
                     .do_request(&config_url, Method::GET, Some(&opts.gitlab_token), None)
-                    .await?
+                    .await
+                    .map_err(|e| format!("Failed to get config: {e}"))?
                     .text()
-                    .await?;
+                    .await
+                    .map_err(|e| format!("Failed to deserialize config: {e}"))?;
 
-                let config: Config = toml::from_str(&config_resp)?;
+                let config: Config = toml::from_str(&config_resp).map_err(|e| {
+                    format!("Failed to deserialize config from toml: {e}\n{config_resp}",)
+                })?;
                 let labels = filter_labels(config, resp_changes).collect::<Vec<_>>();
 
                 let data = serde_json::to_vec(&Labels {
@@ -241,9 +254,17 @@ impl RequestExt for RequestExtImpl {
                 };
 
                 let mut headers = HeaderMap::new();
-                headers.append("Content-Type", HeaderValue::from_str("application/json")?);
+                headers.append(
+                    "Content-Type",
+                    HeaderValue::from_str("application/json")
+                        .map_err(|e| format!("Failed to parse header app/json: {e}"))?,
+                );
                 if let Some(token) = token {
-                    headers.append("PRIVATE-TOKEN", HeaderValue::from_str(token)?);
+                    headers.append(
+                        "PRIVATE-TOKEN",
+                        HeaderValue::from_str(token)
+                            .map_err(|e| format!("Failed to parse header private token: {e}"))?,
+                    );
                 }
 
                 request
@@ -251,7 +272,7 @@ impl RequestExt for RequestExtImpl {
                     .body(body.map(|data| data.to_vec()).unwrap_or_default())
                     .send()
                     .await
-                    .map_err(|e| e.into())
+                    .map_err(|e| format!("failed to send request: {e}").into())
             }
             _ => Err(format!("Invalid scheme in url: {url}, needs to be 'http' or 'https'").into()),
         }
