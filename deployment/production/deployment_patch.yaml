@@ -1,0 +1,34 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: oscar-deployment
+spec:
+  selector:
+    matchLabels:
+      app: oscar  
+  template:
+    spec:
+      containers:
+        - name: oscar
+          imagePullPolicy: Always
+          image: quay.io/cloudflavor/oscar:untagged
+          ports:
+            - containerPort: 8111
+              name: http-port
+          env:
+          - name: OSCAR_GITLAB_TOKEN
+            valueFrom:
+              secretKeyRef:
+                key: GITLAB_TOKEN
+                name: oscar-token
+          - name: OSCAR_GITLAB_API_URI
+            value: "your-gitlab-api-uri" # Replace with your GitLab API URI
+          - name: OSCAR_CONFIG_BRANCH
+            value: "your-gitlab-branch" # Replace with your GitLab branch
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "500m"
+            limits:
+              memory: "1Gi"
+              cpu: "1"

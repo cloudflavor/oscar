@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: oscar-service
+spec:
+  selector:
+    app: oscar
+  ports:
+  - protocol: TCP
+    name: oscar-http
+    port: 8111
+    targetPort: 8111
