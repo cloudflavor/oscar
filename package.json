@@ -1,0 +1,26 @@
+{
+  "name": "oscar",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "deploy:stg": "wrangler deploy --env stg",
+    "deploy:prod": "wrangler deploy --env prod",
+    "logs:stg": "wrangler tail --env stg oscar-stg",
+    "dev": "wrangler dev",
+    "start": "wrangler dev",
+    "test": "vitest",
+    "cf-typegen": "wrangler types"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.1.0",
+    "@cloudflare/workers-types": "^4.20240605.0",
+    "typescript": "^5.0.4",
+    "vitest": "1.3.0",
+    "wrangler": "^3.0.0"
+  },
+  "dependencies": {
+    "@octokit/webhooks": "^13.2.7",
+    "@tsndr/cloudflare-worker-router": "^3.2.4"
+  }
+}
