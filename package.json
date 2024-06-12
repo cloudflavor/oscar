@@ -5,10 +5,9 @@
   "scripts": {
     "deploy": "wrangler deploy",
     "deploy:stg": "wrangler deploy --env stg",
-    "deploy:prod": "wrangler deploy --env prod",
+    "deploy:prd": "wrangler deploy --env prd",
     "logs:stg": "wrangler tail --env stg oscar-stg",
     "dev": "wrangler dev",
-    "start": "wrangler dev",
     "test": "vitest",
     "cf-typegen": "wrangler types"
   },
@@ -21,6 +20,7 @@
   },
   "dependencies": {
     "@octokit/webhooks": "^13.2.7",
-    "@tsndr/cloudflare-worker-router": "^3.2.4"
+    "@tsndr/cloudflare-worker-router": "^3.2.4",
+    "probot": "^13.3.0"
   }
 }
