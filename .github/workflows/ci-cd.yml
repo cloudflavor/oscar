@@ -64,8 +64,6 @@ jobs:
         EOF
       env:
         UNIQUE_HASH: ${{ env.UNIQUE_HASH }}
-    - name: cat wrangler.toml
-      run: cat wrangler.toml
     - name: Publish to Cloudflare Workers (Staging)
       run: wrangler deploy --env stg-${{ env.UNIQUE_HASH }}
       env:
