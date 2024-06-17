@@ -23,16 +23,17 @@ export default async (env: Env, installationId: number): Promise<App> => {
 
     app.webhooks.on('issues.opened', async ({ id, name, payload }) => {
         try {
-            await checkIfLabelsExist(authApp, payload.repository.owner.login, payload.repository.name, ['needs-triage']);
-
-            await authApp.rest.issues.addLabels({
-                owner: payload.repository.owner.login,
-                repo: payload.repository.name,
-                issue_number: payload.issue.number,
-                labels: ['needs-triage']
-            });
+            await addLabels(authApp, payload.repository.owner.login, payload.repository.name, payload.issue.number, ['needs-triage']);
         } catch (error: any) {
-            console.error('Error:', error.message);
+            console.error('Error while adding labels:', error.message);
+        }
+    });
+
+    app.webhooks.on('pull_request.opened', async ({ id, name, payload }) => {
+        try {
+            await addLabels(authApp, payload.repository.owner.login, payload.repository.name, payload.pull_request.number, ['needs-triage']);
+        } catch (error: any) {
+            console.error('Error while adding labels:', error.message);
         }
     });
 
@@ -55,4 +56,15 @@ async function checkIfLabelsExist(authApp: Octokit, owner: string, repo: string,
             });
         }
     }
+}
+
+async function addLabels(app: Octokit, owner: string, repo: string, issue_number: number, labels: string[]) {
+    await checkIfLabelsExist(app, owner, repo, labels);
+
+    await app.rest.issues.addLabels({
+        owner,
+        repo,
+        issue_number,
+        labels,
+    });
 }
