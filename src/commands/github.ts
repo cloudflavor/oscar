@@ -1,5 +1,7 @@
 import { Octokit } from 'octokit';
 
+import { sleep } from '../common';
+
 class CommandRegistry {
     private handlers: { [key: string]: (command: string, app: Octokit, payload: any) => Promise<void>; } = {};
 
@@ -11,16 +13,21 @@ class CommandRegistry {
     }
 
     async processCommand(command: string, app: Octokit, payload: any): Promise<boolean> {
-        const commandPrefix =
-            Object.keys(this.handlers).find(prefix => command.startsWith(prefix));
+        const commands = command.split('\n').map(c => c.trim().replace(/\r/g, '')).filter(c => c !== '');
 
-        if (commandPrefix) {
-            await this.handlers[commandPrefix](command, app, payload);
-            return true;
-        } else {
-            console.log(`No handler found for command: ${command}`);
-            return false;
+        for (const command of commands) {
+            const commandPrefix =
+                Object.keys(this.handlers).find(prefix => command.startsWith(prefix));
+
+            if (commandPrefix) {
+                await this.handlers[commandPrefix](command, app, payload);
+            } else {
+                console.log(`No handler found for command: ${command}`);
+            }
+
+            await sleep(5000);
         }
+        return true;
     }
 }
 
@@ -32,6 +39,7 @@ function newCommandRegistry(): CommandRegistry {
     commandRegistry.registerCommand('/reviewers', handleReviewersCommand);
     commandRegistry.registerCommand('/assign', handleAssigneesCommand);
     commandRegistry.registerCommand('/triage', handleTriageCommand);
+    commandRegistry.registerCommand('/unassign', handleUnassigneesCommand);
 
     return commandRegistry;
 }
@@ -59,6 +67,7 @@ async function handleLabelCommand(command: string, app: Octokit, payload: any): 
         console.log('cleared all labels');
     }
 }
+
 async function handleTriageCommand(command: string, app: Octokit, payload: any): Promise<void> {
     await app.rest.issues.removeLabel({
         owner: payload.repository.owner.login,
@@ -69,7 +78,6 @@ async function handleTriageCommand(command: string, app: Octokit, payload: any):
 
     console.log(`Added "needs-triage" label to issue #${payload.issue.number}`);
 }
-
 
 async function handleRestartActionCommand(command: string, app: Octokit, payload: any): Promise<void> {
     const actionId = command.slice('/restart-action'.length).trim();
@@ -98,11 +106,23 @@ async function handleAssigneesCommand(command: string, app: Octokit, payload: an
     console.log(`Assigning issue #${payload.issue.number} to ${assignees.join(', ')}`);
 }
 
+async function handleUnassigneesCommand(command: string, app: Octokit, payload: any) {
+    const user = payload.comment.user.login;
+
+    await app.rest.issues.removeAssignees({
+        owner: payload.repository.owner.login,
+        repo: payload.repository.name,
+        issue_number: payload.issue.number,
+        assignees: [user],
+    });
+
+    console.log(`Unassigned issue #${payload.issue.number} from ${user}`);
+}
+
 async function handleReviewersCommand(command: string, app: Octokit, payload: any): Promise<void> {
     const match = command.match(/^\/reviewers(?:\s+(.*))?$/);
     const reviewersStr = match ? match[1].trim() : '';
     const reviewers = reviewersStr ? reviewersStr.split(' ').map(reviewer => reviewer.trim().replace(/^@/, '')) : [];
-    console.log(reviewers);
 
     await app.rest.pulls.requestReviewers({
         owner: payload.repository.owner.login,

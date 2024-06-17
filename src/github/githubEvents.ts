@@ -43,29 +43,26 @@ export default async (env: Env, installationId: number): Promise<App> => {
 
     app.webhooks.on('issue_comment', async ({ payload }) => {
         try {
-            if (payload.comment.body.startsWith('/')) {
-                console.log('Processing command:', payload.comment.body);
-                const resp =
-                    await commandRegistry.processCommand(
-                        payload.comment.body,
-                        authApp,
-                        payload,
-                    );
+            const resp =
+                await commandRegistry.processCommand(
+                    payload.comment.body,
+                    authApp,
+                    payload,
+                );
 
-                console.log('Command processed:', resp);
+            console.log('Command processed:', resp);
 
-                if (!resp) {
-                    await authApp.rest.issues.createComment({
-                        owner: payload.repository.owner.login,
-                        repo: payload.repository.name,
-                        issue_number: payload.issue.number,
-                        body: "Can't say I understand that command. 🤔",
-                    });
-                }
+            if (!resp) {
+                await authApp.rest.issues.createComment({
+                    owner: payload.repository.owner.login,
+                    repo: payload.repository.name,
+                    issue_number: payload.issue.number,
+                    body: "Can't say I understand that command. 🤔",
+                });
             }
 
         } catch (error: any) {
-            console.error('Error while adding labels:', error.message);
+            console.error('Error while processing command on issue_comment:', error.message);
         }
     });
 
