@@ -1,7 +1,6 @@
 import { RouterHandler } from "@tsndr/cloudflare-worker-router";
 
 export type Env = {
-    GITHUB_TOKEN: string;
     GITHUB_APP_ID: string;
     GITHUB_CLIENT_ID: string;
     GITHUB_SECRET: string;
