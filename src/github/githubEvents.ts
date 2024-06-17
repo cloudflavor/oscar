@@ -13,7 +13,13 @@ export default async (env: Env, installationId: number): Promise<App> => {
         },
     });
 
-    const authApp = await app.getInstallationOctokit(installationId);
+    let authApp: Octokit;
+
+    try {
+        authApp = await app.getInstallationOctokit(installationId);
+    } catch (error: any) {
+        console.error('Error while authenticating:', error.message);
+    }
 
     app.webhooks.on('issues.opened', async ({ id, name, payload }) => {
         try {

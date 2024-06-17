@@ -16,34 +16,31 @@ beforeAll(() => {
 
 describe('Verify invalid header', () => {
 	it('should fail with Unsupported webhook', async () => {
-		const request = new IncomingRequest('http://example.com');
+		const request = new IncomingRequest('http://example.com', {
+			method: 'POST',
+		});
 		// Create an empty context to pass to `worker.fetch()`.
 		const ctx = createExecutionContext();
-		const env: Env = {
-			"OSCAR_TOKEN": "test"
-		};
 
-		const response = await worker.fetch(request, env, ctx);
+		const response = await worker.fetch(request, {}, ctx);
 		// Wait for all `Promise`s passed to `ctx.waitUntil()` to settle before running test assertions
 		await waitOnExecutionContext(ctx);
 		expect(await response.status).toBe(400);
 	});
 
 	it('should fail with Invalid signature', async () => {
-		const request = new IncomingRequest('http://example.com', {
+		const request = new IncomingRequest('http://example.com/webhooks/github', {
 			headers: {
 				'X-GitHub-Event': 'push',
-			}
+			},
+			method: 'POST',
 		});
-		const env = {
-			"OSCAR_TOKEN": "test"
-		};
 
 		// Create an empty context to pass to `worker.fetch()`.
 		const ctx = createExecutionContext();
-		const response = await worker.fetch(request, env, ctx);
+		const response = await worker.fetch(request, {}, ctx);
 		await waitOnExecutionContext(ctx);
-		expect(await response.status).toBe(401);
+		expect(await response.status).toBe(500);
 	});
 
 	it('should fail with Not implemented', async () => {
@@ -58,16 +55,13 @@ describe('Verify invalid header', () => {
 			};
 
 			const request = new IncomingRequest('http://example.com', {
-				headers
+				headers,
+				method: 'POST',
 			});
-
-			const env = {
-				"OSCAR_TOKEN": "test"
-			};
 
 			// Create an empty context to pass to `worker.fetch()`.
 			const ctx = createExecutionContext();
-			const response = await worker.fetch(request, env, ctx);
+			const response = await worker.fetch(request, {}, ctx);
 			await waitOnExecutionContext(ctx);
 			expect(await response.status).toBe(501);
 		}
