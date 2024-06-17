@@ -31,6 +31,7 @@ function newCommandRegistry(): CommandRegistry {
     commandRegistry.registerCommand('/restart-action', handleRestartActionCommand);
     commandRegistry.registerCommand('/reviewers', handleReviewersCommand);
     commandRegistry.registerCommand('/assign', handleAssigneesCommand);
+    commandRegistry.registerCommand('/triage', handleTriageCommand);
 
     return commandRegistry;
 }
@@ -45,7 +46,7 @@ async function handleLabelCommand(command: string, app: Octokit, payload: any): 
             owner: payload.repository.owner.login,
             repo: payload.repository.name,
             issue_number: payload.issue.number,
-            labels: labels
+            labels
         });
 
         console.log(`Added labels "${labels.join(', ')}" to issue #${payload.issue.number}`);
@@ -58,6 +59,17 @@ async function handleLabelCommand(command: string, app: Octokit, payload: any): 
         console.log('cleared all labels');
     }
 }
+async function handleTriageCommand(command: string, app: Octokit, payload: any): Promise<void> {
+    await app.rest.issues.removeLabel({
+        owner: payload.repository.owner.login,
+        repo: payload.repository.name,
+        issue_number: payload.issue.number,
+        name: 'needs-triage',
+    });
+
+    console.log(`Added "needs-triage" label to issue #${payload.issue.number}`);
+}
+
 
 async function handleRestartActionCommand(command: string, app: Octokit, payload: any): Promise<void> {
     const actionId = command.slice('/restart-action'.length).trim();
