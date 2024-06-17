@@ -6,7 +6,7 @@ compatibility_flags = ["nodejs_compat"]
 
 [env.prd]
 routes = [
-    { pattern = "oscar.cloudflavor.io", zone_name = "cloudflavor.io", custom_domain = true },
+    { pattern = "oscar.svc.cloudflavor.io", zone_name = "cloudflavor.io", custom_domain = true },
 ]
 
 [env.prd.vars]
