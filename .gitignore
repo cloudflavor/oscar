@@ -21,3 +21,5 @@ yarn-error.log*
 # Output directories
 dist/
 build/
+.dev.vars
+.wrangler
