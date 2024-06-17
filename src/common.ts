@@ -10,3 +10,7 @@ export type Env = {
 };
 
 export type Handler = RouterHandler<Env, ExecutionContext, Request>;
+
+export const sleep = (ms: number) => {
+    return new Promise(resolve => setTimeout(resolve, ms));
+};

@@ -1,6 +1,8 @@
 import { App, Octokit } from 'octokit';
 
 import { Env } from '../common';
+import { newCommandRegistry } from '../commands/github';
+
 
 export default async (env: Env, installationId: number): Promise<App> => {
     const app = new App({
@@ -21,7 +23,9 @@ export default async (env: Env, installationId: number): Promise<App> => {
         console.error('Error while authenticating:', error.message);
     }
 
-    app.webhooks.on('issues.opened', async ({ id, name, payload }) => {
+    const commandRegistry = newCommandRegistry();
+
+    app.webhooks.on('issues.opened', async ({ payload }) => {
         try {
             await addLabels(authApp, payload.repository.owner.login, payload.repository.name, payload.issue.number, ['needs-triage']);
         } catch (error: any) {
@@ -29,7 +33,7 @@ export default async (env: Env, installationId: number): Promise<App> => {
         }
     });
 
-    app.webhooks.on('pull_request.opened', async ({ id, name, payload }) => {
+    app.webhooks.on('pull_request.opened', async ({ payload }) => {
         try {
             await addLabels(authApp, payload.repository.owner.login, payload.repository.name, payload.pull_request.number, ['needs-triage']);
         } catch (error: any) {
@@ -37,8 +41,33 @@ export default async (env: Env, installationId: number): Promise<App> => {
         }
     });
 
+    app.webhooks.on('issue_comment', async ({ payload }) => {
+        try {
+            const resp =
+                await commandRegistry.processCommand(
+                    payload.comment.body,
+                    authApp,
+                    payload,
+                );
+
+            console.log('Command processed:', resp);
+
+            if (!resp) {
+                await authApp.rest.issues.createComment({
+                    owner: payload.repository.owner.login,
+                    repo: payload.repository.name,
+                    issue_number: payload.issue.number,
+                    body: "Can't say I understand that command. 🤔",
+                });
+            }
+
+        } catch (error: any) {
+            console.error('Error while processing command on issue_comment:', error.message);
+        }
+    });
+
     return app;
-}
+};
 
 async function checkIfLabelsExist(authApp: Octokit, owner: string, repo: string, labels: string[]): Promise<void> {
     const existingLabels = await authApp.rest.issues.listLabelsForRepo({
