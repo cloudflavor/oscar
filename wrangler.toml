@@ -10,9 +10,9 @@ routes = [
     { pattern = "oscar.svc.cloudflavor.io", zone_name = "cloudflavor.io", custom_domain = true },
 ]
 [[env.prd.unsafe.bindings]]
+namespace_id = "1505"
 name = "OSCAR_RATE_LIMITER"
 type = "ratelimit"
-namespace_id = 15005
 simple = { limit = 100, period = 60 }
 
 [env.prd.vars]
@@ -32,5 +32,5 @@ OSCAR_ACCESS_CONFIG_URI = "https://raw.githubusercontent.com/cloudflavor/access/
 [[env.dev.unsafe.bindings]]
 name = "OSCAR_RATE_LIMITER"
 type = "ratelimit"
-namespace_id = 15005
+namespace_id = "1506"
 simple = { limit = 100, period = 60 }
