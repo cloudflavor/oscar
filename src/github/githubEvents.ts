@@ -48,27 +48,12 @@ export default async (env: Env, installationId: number): Promise<App> => {
     });
 
     app.webhooks.on('issue_comment', async ({ payload }) => {
-        if (!payload.comment.body.startsWith('/')) {
-            return;
-        }
-
         try {
-            const resp =
-                await commandRegistry.processCommand(
-                    payload.comment.body,
-                    authApp,
-                    payload,
-                );
-
-            if (!resp) {
-                await authApp.rest.issues.createComment({
-                    owner: payload.repository.owner.login,
-                    repo: payload.repository.name,
-                    issue_number: payload.issue.number,
-                    body: "Can't say I understand that command. 🤔",
-                });
-            }
-
+            await commandRegistry.processCommand(
+                payload.comment.body,
+                authApp,
+                payload,
+            );
         } catch (error: any) {
             console.error('Error while processing command on issue_comment:', error.message);
         }

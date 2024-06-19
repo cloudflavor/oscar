@@ -18,7 +18,7 @@ class CommandRegistry {
         for (const command of commands) {
             if (!command.startsWith('/')) {
                 console.log('Invalid command:', command);
-                return false;
+                continue;
             }
 
             const commandPrefix =
