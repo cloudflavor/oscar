@@ -52,6 +52,7 @@ jobs:
     - name: Create wrangler environment for staging
       run: |
         cat <<EOF >> wrangler.toml
+
         [env.stg-${{ env.UNIQUE_HASH }}]
         routes = [{ pattern = "svc-stg.cloudflavor.io/${{ env.UNIQUE_HASH }}/*", zone_name = "cloudflavor.io" }]
 
@@ -59,11 +60,12 @@ jobs:
         [[env.stg-${{ env.UNIQUE_HASH }}.unsafe.bindings]]
         name = "OSCAR_RATE_LIMITER"
         type = "ratelimit"
-        namespace_id = 15005
+        namespace_id = "1507"
         simple = { limit = 100, period = 60 }
 
         [env.stg-${{ env.UNIQUE_HASH }}.vars]
         OSCAR_LOG_LEVEL = "debug"
+
         EOF
       env:
         UNIQUE_HASH: ${{ env.UNIQUE_HASH }}
