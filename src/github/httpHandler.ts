@@ -26,5 +26,5 @@ const githubHandler: Handler =
         }
 
         return new Response('OK', { status: 200 });
-    }
+    };
 export { githubHandler };
