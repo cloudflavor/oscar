@@ -6,6 +6,10 @@ export type Env = {
     GITHUB_SECRET: string;
     GITHUB_WEBHOOK_SECRET: string;
     GITHUB_PRIVATE_KEY: string;
+
+    OSCAR_ACCESS_CONFIG_URI: string;
+
+    OSCAR_RATE_LIMITER: any;
 };
 
 export type Handler = RouterHandler<Env, ExecutionContext, Request>;

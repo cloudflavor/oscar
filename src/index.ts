@@ -11,6 +11,15 @@ router.post('/webhooks/github', githubHandler);
 
 export default {
 	async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+		const { pathname } = new URL(request.url);
+		console.log(`Request for ${pathname}`);
+		console.log(env.OSCAR_RATE_LIMITER);
+		const { success } = await env.OSCAR_RATE_LIMITER.limit({ key: pathname });
+
+		if (!success) {
+			return new Response(`429 Failure – rate limit exceeded for ${pathname}`, { status: 429 });
+		}
+
 		const source = request.headers.get('X-GitHub-Event') ? 'github' :
 			request.headers.get('X-Gitlab-Event') ? 'gitlab' :
 				request.headers.get('X-Gitea-Event') ? 'gitea' : 'unknown';
@@ -32,4 +41,4 @@ export default {
 
 		return router.handle(request, env, ctx);
 	}
-}
+};
