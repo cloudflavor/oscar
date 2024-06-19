@@ -12,8 +12,6 @@ router.post('/webhooks/github', githubHandler);
 export default {
 	async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
 		const { pathname } = new URL(request.url);
-		console.log(`Request for ${pathname}`);
-		console.log(env.OSCAR_RATE_LIMITER);
 		const { success } = await env.OSCAR_RATE_LIMITER.limit({ key: pathname });
 
 		if (!success) {
