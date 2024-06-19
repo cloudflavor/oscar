@@ -9,9 +9,28 @@ import { Env } from '../src/common';
 // `Request` to pass to `worker.fetch()`.
 const IncomingRequest = Request<unknown, IncomingRequestCfProperties>;
 
+declare global {
+	var env: Env;
+}
+
 beforeAll(() => {
 	// Set the environment variable for all tests
-	process.env.OSCAR_TOKEN = "test";
+	const env: Env = {
+		OSCAR_RATE_LIMITER: {
+			limit: async ({ key }: { key: string; }) => {
+				console.log(`Limiting ${key}`);
+				return { success: true };
+			},
+		},
+		GITHUB_APP_ID: '123',
+		GITHUB_CLIENT_ID: '123',
+		GITHUB_SECRET: '123',
+		GITHUB_WEBHOOK_SECRET: '123',
+		GITHUB_PRIVATE_KEY: '123',
+		OSCAR_ACCESS_CONFIG_URI: '123',
+	};
+
+	globalThis.env = env;
 });
 
 describe('Verify invalid header', () => {
@@ -22,7 +41,7 @@ describe('Verify invalid header', () => {
 		// Create an empty context to pass to `worker.fetch()`.
 		const ctx = createExecutionContext();
 
-		const response = await worker.fetch(request, {}, ctx);
+		const response = await worker.fetch(request, globalThis.env, ctx);
 		// Wait for all `Promise`s passed to `ctx.waitUntil()` to settle before running test assertions
 		await waitOnExecutionContext(ctx);
 		expect(await response.status).toBe(400);
@@ -38,7 +57,7 @@ describe('Verify invalid header', () => {
 
 		// Create an empty context to pass to `worker.fetch()`.
 		const ctx = createExecutionContext();
-		const response = await worker.fetch(request, {}, ctx);
+		const response = await worker.fetch(request, globalThis.env, ctx);
 		await waitOnExecutionContext(ctx);
 		expect(await response.status).toBe(500);
 	});
@@ -61,7 +80,7 @@ describe('Verify invalid header', () => {
 
 			// Create an empty context to pass to `worker.fetch()`.
 			const ctx = createExecutionContext();
-			const response = await worker.fetch(request, {}, ctx);
+			const response = await worker.fetch(request, globalThis.env, ctx);
 			await waitOnExecutionContext(ctx);
 			expect(await response.status).toBe(501);
 		}
