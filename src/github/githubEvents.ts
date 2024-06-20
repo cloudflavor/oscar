@@ -2,6 +2,7 @@ import { App, Octokit } from 'octokit';
 
 import { Env } from '../common';
 import { newCommandRegistry } from '../commands/github';
+import { parseTomlConfig } from '../config';
 
 
 export default async (env: Env, installationId: number): Promise<App> => {
@@ -24,10 +25,24 @@ export default async (env: Env, installationId: number): Promise<App> => {
     }
 
     const commandRegistry = newCommandRegistry();
+    const config = await parseTomlConfig(env.OSCAR_ACCESS_CONFIG_URI);
+    if (!config) {
+        throw new Error('Error while parsing the config file');
+    }
+    config.checkPermissions = (user) => {
+        return user === config.admin.name;
+    };
+
 
     app.webhooks.on('issues.opened', async ({ payload }) => {
         try {
-            await addLabels(authApp, payload.repository.owner.login, payload.repository.name, payload.issue.number, ['needs-triage']);
+            await addLabels(
+                authApp,
+                payload.repository.owner.login,
+                payload.repository.name,
+                payload.issue.number,
+                ['needs-triage'],
+            );
         } catch (error: any) {
             console.error('Error while adding labels:', error.message);
         }
@@ -35,7 +50,13 @@ export default async (env: Env, installationId: number): Promise<App> => {
 
     app.webhooks.on('pull_request.opened', async ({ payload }) => {
         try {
-            await addLabels(authApp, payload.repository.owner.login, payload.repository.name, payload.pull_request.number, ['needs-triage']);
+            await addLabels(
+                authApp,
+                payload.repository.owner.login,
+                payload.repository.name,
+                payload.pull_request.number,
+                ['needs-triage']
+            );
             authApp.rest.reactions.createForIssueComment({
                 owner: payload.repository.owner.login,
                 repo: payload.repository.name,
@@ -48,6 +69,17 @@ export default async (env: Env, installationId: number): Promise<App> => {
     });
 
     app.webhooks.on('issue_comment', async ({ payload }) => {
+        // NOTE: This should be an error if there's no user.
+        const user = payload.comment.user?.login;
+        if (!user) {
+            return;
+        }
+
+        if (!config.checkPermissions(user)) {
+            console.log('User does not have permissions:', user);
+            return;
+        }
+
         try {
             await commandRegistry.processCommand(
                 payload.comment.body,
@@ -60,29 +92,31 @@ export default async (env: Env, installationId: number): Promise<App> => {
     });
 
     app.webhooks.on('workflow_run', async ({ payload }) => {
-        const repo = authApp.rest.repos.get({
-            owner: payload.repository.owner.login,
-            repo: payload.repository.name,
-        });
+        const owner = payload.repository.owner.login;
+        const repo = payload.repository.name;
+        const mainBranch = payload.repository.default_branch;
+        const workflowRun = payload.workflow_run;
 
-        if (payload.workflow_run.conclusion === 'failure' && payload.workflow_run.head_branch === 'main') {
+        if (
+            workflowRun.conclusion === 'failure' &&
+            workflowRun.head_branch === mainBranch
+        ) {
             // TODO: need to just update the issues instead of creating a new one every
             // time.
             // Otherwise it will create an issue for all of the failed runs.
             try {
                 const resp = await authApp.rest.issues.create({
-                    owner: payload.repository.owner.login,
-                    repo: payload.repository.name,
+                    owner,
+                    repo,
                     title: 'Workflow failed',
                     body: `The main branch workflow failed. Please check the logs and fix the issue. ${payload.workflow_run.html_url}`,
                 });
-                await addLabels(authApp, payload.repository.owner.login, payload.repository.name, resp.data.number, ['ci-failure']);
+                await addLabels(authApp, owner, repo, resp.data.number, ['ci-failure']);
             } catch (error: any) {
                 console.error('Error while creating issue:', error.message);
             }
         }
     });
-
 
     return app;
 };
