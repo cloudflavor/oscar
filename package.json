@@ -20,6 +20,8 @@
   },
   "dependencies": {
     "@tsndr/cloudflare-worker-router": "^3.2.4",
-    "octokit": "^4.0.2"
+    "axios": "^1.7.2",
+    "octokit": "^4.0.2",
+    "smol-toml": "^1.2.1"
   }
 }
