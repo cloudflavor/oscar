@@ -7,7 +7,7 @@
     "deploy:stg": "wrangler deploy --env stg",
     "deploy:prd": "wrangler deploy --env prd",
     "logs:stg": "wrangler tail --env stg oscar-stg",
-    "dev": "wrangler dev",
+    "dev": "wrangler dev --env dev",
     "test": "vitest",
     "cf-typegen": "wrangler types"
   },
@@ -19,9 +19,8 @@
     "wrangler": "^3.0.0"
   },
   "dependencies": {
+    "@ltd/j-toml": "^1.38.0",
     "@tsndr/cloudflare-worker-router": "^3.2.4",
-    "axios": "^1.7.2",
-    "octokit": "^4.0.2",
-    "smol-toml": "^1.2.1"
+    "octokit": "^4.0.2"
   }
 }
