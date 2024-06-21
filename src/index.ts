@@ -2,7 +2,6 @@ import { Router } from '@tsndr/cloudflare-worker-router';
 
 import { githubHandler } from './github/httpHandler';
 import { Env, } from './common';
-import { parseTomlConfig } from './config';
 
 const router = new Router<Env, ExecutionContext, Request>();
 

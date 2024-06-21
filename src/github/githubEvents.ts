@@ -1,6 +1,6 @@
 import { App, Octokit } from 'octokit';
 
-import { Env } from '../common';
+import { Config, Env } from '../common';
 import { newCommandRegistry } from '../commands/github';
 import { parseTomlConfig } from '../config';
 
@@ -25,13 +25,17 @@ export default async (env: Env, installationId: number): Promise<App> => {
     }
 
     const commandRegistry = newCommandRegistry();
-    const config = await parseTomlConfig(env.OSCAR_ACCESS_CONFIG_URI);
-    if (!config) {
-        throw new Error('Error while parsing the config file');
+
+    let config: Config;
+
+    try {
+        const config = await parseTomlConfig(env.OSCAR_ACCESS_CONFIG_URI);
+        if (!config) {
+            throw new Error('Error while parsing the config file');
+        }
+    } catch (error: any) {
+        console.error('Error while parsing the config file:', error.message);
     }
-    config.checkPermissions = (user) => {
-        return user === config.admin.name;
-    };
 
 
     app.webhooks.on('issues.opened', async ({ payload }) => {
