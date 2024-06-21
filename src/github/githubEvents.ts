@@ -72,7 +72,7 @@ export default async (env: Env, installationId: number): Promise<App> => {
         }
     });
 
-    app.webhooks.on('issue_comment', async ({ payload }) => {
+    const handleComment = async (payload: any) => {
         // NOTE: This should be an error if there's no user.
         const user = payload.comment.user?.login;
         if (!user) {
@@ -93,6 +93,14 @@ export default async (env: Env, installationId: number): Promise<App> => {
         } catch (error: any) {
             console.error('Error while processing command on issue_comment:', error.message);
         }
+    };
+
+    app.webhooks.on('issue_comment.created', async ({ payload }) => {
+        await handleComment(payload);
+    });
+
+    app.webhooks.on('issue_comment.edited', async ({ payload }) => {
+        await handleComment(payload);
     });
 
     app.webhooks.on('workflow_run', async ({ payload }) => {
