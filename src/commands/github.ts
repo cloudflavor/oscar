@@ -3,7 +3,9 @@ import { Octokit } from 'octokit';
 import { sleep } from '../common';
 
 class CommandRegistry {
-    private handlers: { [key: string]: (command: string, app: Octokit, payload: any) => Promise<void>; } = {};
+    private handlers: {
+        [key: string]: (command: string, app: Octokit, payload: any) => Promise<void>;
+    } = {};
 
     registerCommand(
         commandPrefix: string,
@@ -331,6 +333,11 @@ async function handleCloseCommand(command: string, app: Octokit, payload: any) {
 }
 
 async function handlePrMergeCommand(command: string, app: Octokit, payload: any) {
+    const workflows = await app.rest.actions.listRepoWorkflows({
+        owner: payload.repository.owner.login,
+        repo: payload.repository.name,
+    });
+
     await app.rest.pulls.merge({
         owner: payload.repository.owner.login,
         repo: payload.repository.name,

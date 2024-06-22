@@ -38,5 +38,9 @@ export default {
 		}
 
 		return router.handle(request, env, ctx);
+	},
+
+	async scheduled(env: Env, ctx: ExecutionContext): Promise<void> {
+		console.log('Scheduled task');
 	}
 };
