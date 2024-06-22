@@ -56,6 +56,8 @@ function newCommandRegistry(): CommandRegistry {
     commandRegistry.registerCommand('/reopen', handleReopenCommand);
     commandRegistry.registerCommand('/merge', handlePrMergeCommand);
     commandRegistry.registerCommand('/rename', handleRenameCommand);
+    commandRegistry.registerCommand('/hold', handlePrHoldCommand);
+    commandRegistry.registerCommand('/unhold', handleUnholdCommand);
 
     return commandRegistry;
 }
@@ -330,7 +332,43 @@ async function handleCloseCommand(command: string, app: Octokit, payload: any) {
     console.log(`Closed issue #${payload.issue.number}`);
 }
 
+async function handlePrHoldCommand(command: string, app: Octokit, payload: any) {
+    await app.rest.issues.addLabels({
+        owner: payload.repository.owner.login,
+        repo: payload.repository.name,
+        issue_number: payload.issue.number,
+        labels: ['do-not-merge'],
+    });
+}
+
+async function handleUnholdCommand(command: string, app: Octokit, payload: any) {
+    await app.rest.issues.removeLabel({
+        owner: payload.repository.owner.login,
+        repo: payload.repository.name,
+        issue_number: payload.issue.number,
+        name: 'do-not-merge',
+    });
+}
+
+
 async function handlePrMergeCommand(command: string, app: Octokit, payload: any) {
+    const labels = await app.rest.issues.listLabelsOnIssue({
+        owner: payload.repository.owner.login,
+        repo: payload.repository.name,
+        issue_number: payload.issue.number,
+    });
+
+    if (labels.data.some(label => label.name === 'do-not-merge')) {
+        console.log(`Skipping merge for pull request #${payload.issue.number} due to "do-not-merge" label`);
+        await app.rest.issues.createComment({
+            owner: payload.repository.owner.login,
+            repo: payload.repository.name,
+            issue_number: payload.issue.number,
+            body: 'Skipping merge due to "do-not-merge" label',
+        });
+        return;
+    }
+
     await app.rest.pulls.merge({
         owner: payload.repository.owner.login,
         repo: payload.repository.name,
