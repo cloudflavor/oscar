@@ -352,6 +352,30 @@ async function handleUnholdCommand(command: string, app: Octokit, payload: any) 
 
 
 async function handlePrMergeCommand(command: string, app: Octokit, payload: any) {
+    const match = command.match(/^\/merge(?:\s+(.*))?$/);
+    const override = match?.[1]?.trim() || '';
+
+    // TODO: Force should only be allowed for specific users, admins more specifically.
+    // TODO: Don't merge if PR is already merged.
+    // TODO: Don't merge if there are conflicts.
+    if (override === 'force') {
+        console.log(`Force merging pull request #${payload.issue.number}`);
+
+        await app.rest.issues.createComment({
+            owner: payload.repository.owner.login,
+            repo: payload.repository.name,
+            issue_number: payload.issue.number,
+            body: 'Force merging pull request',
+        });
+
+        await app.rest.pulls.merge({
+            owner: payload.repository.owner.login,
+            repo: payload.repository.name,
+            pull_number: payload.issue.number,
+        });
+        return;
+    }
+
     const labels = await app.rest.issues.listLabelsOnIssue({
         owner: payload.repository.owner.login,
         repo: payload.repository.name,
@@ -367,6 +391,48 @@ async function handlePrMergeCommand(command: string, app: Octokit, payload: any)
             body: 'Skipping merge due to "do-not-merge" label',
         });
         return;
+    }
+
+    const pullRequest = await app.rest.pulls.get({
+        owner: payload.repository.owner.login,
+        repo: payload.repository.name,
+        pull_number: payload.issue.number,
+    });
+
+    const jobs = await app.rest.checks.listForRef({
+        owner: payload.repository.owner.login,
+        repo: payload.repository.name,
+        ref: pullRequest.data.head.sha,
+    });
+
+    for (const job of jobs.data.check_runs) {
+        switch (job.status) {
+            case 'queued':
+            case 'pending':
+            case 'requested':
+            case 'waiting':
+            case 'in_progress':
+                console.log(`Skipping merge for pull request #${payload.issue.number} due to pending checks`);
+                await app.rest.issues.createComment({
+                    owner: payload.repository.owner.login,
+                    repo: payload.repository.name,
+                    issue_number: payload.issue.number,
+                    body: 'Skipping merge due to pending checks',
+                });
+                return;
+            case 'completed':
+                if (job.conclusion === 'failure') {
+                    console.log(`Skipping merge for pull request #${payload.issue.number} due to failed checks`);
+                    await app.rest.issues.createComment({
+                        owner: payload.repository.owner.login,
+                        repo: payload.repository.name,
+                        issue_number: payload.issue.number,
+                        body: 'Merge not possible due to failed checks',
+                    });
+                    return;
+                }
+                break;
+        }
     }
 
     await app.rest.pulls.merge({
