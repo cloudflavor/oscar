@@ -54,7 +54,7 @@ jobs:
         cat <<EOF >> wrangler.toml
 
         [env.stg-${{ env.UNIQUE_HASH }}]
-        routes = [{ pattern = "svc-stg.cloudflavor.io/${{ env.UNIQUE_HASH }}/*", zone_name = "cloudflavor.io" }]
+        routes = [{ pattern = "svc-stg.cloudflavor.dev/${{ env.UNIQUE_HASH }}/*", zone_name = "cloudflavor.dev" }]
 
         [env.stg-${{ env.UNIQUE_HASH }}.unsafe]
         [[env.stg-${{ env.UNIQUE_HASH }}.unsafe.bindings]]

@@ -7,7 +7,7 @@ workers_dev = false
 
 [env.prd]
 routes = [
-    { pattern = "oscar.svc.cloudflavor.io", zone_name = "cloudflavor.io", custom_domain = true },
+    { pattern = "oscar.svc.cloudflavor.dev", zone_name = "cloudflavor.dev", custom_domain = true },
 ]
 [[env.prd.unsafe.bindings]]
 namespace_id = "1505"
