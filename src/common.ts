@@ -25,6 +25,9 @@ export type Config = {
     checkPermissions(user: string): boolean;
 };
 
+// NOTE: can't find this union type in the codebase for octokit
+export type ReactionContent = '+1' | '-1' | 'laugh' | 'confused' | 'heart' | 'hooray' | 'rocket' | 'eyes';
+
 const parseTomlConfig =
     async (uri: string): Promise<Config | undefined> => {
         const response = await fetch(uri);

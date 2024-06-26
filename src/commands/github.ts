@@ -47,17 +47,26 @@ function newCommandRegistry(): CommandRegistry {
 
     // Command handlers for issues and pull requests
     commandRegistry.registerCommand('/label', handleLabelCommand);
-    commandRegistry.registerCommand('/reviewers', handleReviewersCommand);
     commandRegistry.registerCommand('/assign', handleAssigneesCommand);
     commandRegistry.registerCommand('/triage', handleTriageCommand);
     commandRegistry.registerCommand('/unassign', handleUnassigneesCommand);
+    commandRegistry.registerCommand('/lock', handleIssueLockCommand);
+    commandRegistry.registerCommand('/unlock', handleIssueUnlockCommand);
+    commandRegistry.registerCommand('/milestone', handleMilestoneCommand);
+    commandRegistry.registerCommand('/pin', handleIssuePin);
+    commandRegistry.registerCommand('/unpin', handleIssueUnpin);
 
     commandRegistry.registerCommand('/close', handleCloseCommand);
+    commandRegistry.registerCommand('/reviewers', handleReviewersCommand);
     commandRegistry.registerCommand('/reopen', handleReopenCommand);
     commandRegistry.registerCommand('/merge', handlePrMergeCommand);
     commandRegistry.registerCommand('/rename', handleRenameCommand);
     commandRegistry.registerCommand('/hold', handlePrHoldCommand);
     commandRegistry.registerCommand('/unhold', handleUnholdCommand);
+    commandRegistry.registerCommand('/draft', handlePrDraftCommand);
+    commandRegistry.registerCommand('/approve', handlePrApproveCommand);
+    commandRegistry.registerCommand('/unapprove', handlePrUnapproveCommand);
+
 
     return commandRegistry;
 }
@@ -356,8 +365,6 @@ async function handlePrMergeCommand(command: string, app: Octokit, payload: any)
     const override = match?.[1]?.trim() || '';
 
     // TODO: Force should only be allowed for specific users, admins more specifically.
-    // TODO: Don't merge if PR is already merged.
-    // TODO: Don't merge if there are conflicts.
     if (override === 'force') {
         console.log(`Force merging pull request #${payload.issue.number}`);
 
@@ -393,11 +400,33 @@ async function handlePrMergeCommand(command: string, app: Octokit, payload: any)
         return;
     }
 
+    if (labels.data.some(label => label.name !== 'approved')) {
+        console.log(`Skipping merge for pull request #${payload.issue.number} due to missing "approved" label`);
+        await app.rest.issues.createComment({
+            owner: payload.repository.owner.login,
+            repo: payload.repository.name,
+            issue_number: payload.issue.number,
+            body: 'Skipping merge due to missing "approved" label',
+        });
+        return;
+    }
+
     const pullRequest = await app.rest.pulls.get({
         owner: payload.repository.owner.login,
         repo: payload.repository.name,
         pull_number: payload.issue.number,
     });
+
+    if (pullRequest.data.merged) {
+        console.log(`Skipping merge for pull request #${payload.issue.number} due to already merged`);
+        await app.rest.issues.createComment({
+            owner: payload.repository.owner.login,
+            repo: payload.repository.name,
+            issue_number: payload.issue.number,
+            body: 'Skipping merge due to already merged',
+        });
+        return;
+    }
 
     const jobs = await app.rest.checks.listForRef({
         owner: payload.repository.owner.login,
@@ -435,6 +464,28 @@ async function handlePrMergeCommand(command: string, app: Octokit, payload: any)
         }
     }
 
+    if (pullRequest.data.draft) {
+        console.log(`Skipping merge for pull request #${payload.issue.number} due to draft status`);
+        await app.rest.issues.createComment({
+            owner: payload.repository.owner.login,
+            repo: payload.repository.name,
+            issue_number: payload.issue.number,
+            body: 'Skipping merge due to draft status',
+        });
+        return;
+    }
+
+    if (pullRequest.data.mergeable === false) {
+        console.log(`Skipping merge for pull request #${payload.issue.number} due to conflicts`);
+        await app.rest.issues.createComment({
+            owner: payload.repository.owner.login,
+            repo: payload.repository.name,
+            issue_number: payload.issue.number,
+            body: 'Skipping merge due to conflicts',
+        });
+        return;
+    }
+
     await app.rest.pulls.merge({
         owner: payload.repository.owner.login,
         repo: payload.repository.name,
@@ -442,6 +493,141 @@ async function handlePrMergeCommand(command: string, app: Octokit, payload: any)
     });
 
     console.log(`Merged pull request #${payload.issue.number}`);
+}
+
+async function handlePrDraftCommand(command: string, app: Octokit, payload: any) {
+    await app.rest.pulls.update({
+        owner: payload.repository.owner.login,
+        repo: payload.repository.name,
+        pull_number: payload.issue.number,
+        draft: true,
+    });
+
+    console.log(`Marked pull request #${payload.issue.number} as draft`);
+}
+
+async function handlePrApproveCommand(command: string, app: Octokit, payload: any) {
+    await app.rest.issues.addLabels({
+        owner: payload.repository.owner.login,
+        repo: payload.repository.name,
+        issue_number: payload.issue.number,
+        labels: ['approved'],
+    });
+
+    console.log(`Approved pull request #${payload.issue.number}`);
+}
+
+async function handlePrUnapproveCommand(command: string, app: Octokit, payload: any) {
+    await app.rest.pulls.createReview({
+        owner: payload.repository.owner.login,
+        repo: payload.repository.name,
+        pull_number: payload.issue.number,
+    });
+
+    await app.rest.issues.removeLabel({
+        owner: payload.repository.owner.login,
+        repo: payload.repository.name,
+        issue_number: payload.issue.number,
+        name: 'approved',
+    });
+
+    console.log(`Unapproved pull request #${payload.issue.number}`);
+}
+
+async function handleIssueLockCommand(command: string, app: Octokit, payload: any): Promise<void> {
+    // TODO: should be limited to admins
+    await app.rest.issues.lock({
+        owner: payload.repository.owner.login,
+        repo: payload.repository.name,
+        issue_number: payload.issue.number,
+    });
+
+    console.log(`Locked issue #${payload.issue.number}`);
+}
+
+async function handleIssueUnlockCommand(command: string, app: Octokit, payload: any): Promise<void> {
+    // TODO: should be limited to admins
+    await app.rest.issues.unlock({
+        owner: payload.repository.owner.login,
+        repo: payload.repository.name,
+        issue_number: payload.issue.number,
+    });
+
+    console.log(`Unlocked issue #${payload.issue.number}`);
+}
+
+async function handleMilestoneCommand(command: string, app: Octokit, payload: any): Promise<void> {
+    const match = command.match(/^\/milestone(?:\s+(.*))?$/);
+    const milestone = match ? (match[1] || '').trim() : '';
+
+    if (milestone === 'clear') {
+        await app.rest.issues.update({
+            owner: payload.repository.owner.login,
+            repo: payload.repository.name,
+            issue_number: payload.issue.number,
+            milestone: null,
+        });
+
+        console.log(`Cleared milestone for issue #${payload.issue.number}`);
+        return;
+    }
+
+    if (milestone) {
+        const milestones = await app.rest.issues.listMilestones({
+            owner: payload.repository.owner.login,
+            repo: payload.repository.name,
+        });
+
+        const milestoneId = milestones.data.find(m => m.title === milestone)?.number;
+        if (!milestoneId) {
+            console.log(`No milestone found for the title: ${milestone}`);
+            return;
+        }
+
+        console.log(`Set milestone for issue #${payload.issue.number} to ${milestone}`);
+    } else {
+        console.log(`No milestone specified in the command: ${command}`);
+    }
+}
+
+async function handleIssuePin(command: string, app: Octokit, payload: any): Promise<void> {
+    // NOTE: seems that rest does not have a valid way to update the pinned status of an issue
+    const issueId = payload.issue.node_id;
+    const mutation = `
+      mutation($issueId: ID!) {
+        pinIssue(input: { issueId: $issueId }) {
+          issue {
+            id
+          }
+        }
+      }
+    `;
+
+    await app.graphql(mutation, {
+        issueId: payload.issue.node_id,
+    });
+
+    console.log(`Pinned issue #${payload.issue.number}`);
+}
+
+async function handleIssueUnpin(command: string, app: Octokit, payload: any): Promise<void> {
+    // NOTE: seems that rest does not have a valid way to update the pinned status of an issue
+    const issueId = payload.issue.node_id;
+    const mutation = `
+      mutation($issueId: ID!) {
+        unpinIssue(input: { issueId: $issueId }) {
+          issue {
+            id
+          }
+        }
+      }
+    `;
+
+    await app.graphql(mutation, {
+        issueId: payload.issue.node_id,
+    });
+
+    console.log(`Unpinned issue #${payload.issue.number}`);
 }
 
 async function handleReviewersCommand(command: string, app: Octokit, payload: any): Promise<void> {

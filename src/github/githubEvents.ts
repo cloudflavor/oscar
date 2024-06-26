@@ -1,6 +1,6 @@
 import { App, Octokit } from 'octokit';
 
-import { Config, Env, parseTomlConfig } from '../common';
+import { Config, Env, parseTomlConfig, ReactionContent } from '../common';
 import { newCommandRegistry } from '../commands/github';
 
 
@@ -47,6 +47,14 @@ export default async (env: Env, installationId: number): Promise<App> => {
                 payload.issue.number,
                 ['needs-triage'],
             );
+
+
+            await authApp.rest.reactions.createForIssue({
+                owner: payload.repository.owner.login,
+                repo: payload.repository.name,
+                issue_number: payload.issue.number,
+                content: 'eyes',
+            });
         } catch (error: any) {
             console.error('Error while adding labels:', error.message);
         }
@@ -61,12 +69,17 @@ export default async (env: Env, installationId: number): Promise<App> => {
                 payload.pull_request.number,
                 ['needs-triage']
             );
-            authApp.rest.reactions.createForIssueComment({
-                owner: payload.repository.owner.login,
-                repo: payload.repository.name,
-                comment_id: payload.pull_request.id,
-                content: '+1',
-            });
+
+            const reactions: ReactionContent[] = ['+1', 'rocket', 'heart'];
+
+            for (const content of reactions) {
+                await authApp.rest.reactions.createForIssueComment({
+                    owner: payload.repository.owner.login,
+                    repo: payload.repository.name,
+                    comment_id: payload.pull_request.id,
+                    content,
+                });
+            }
         } catch (error: any) {
             console.error('Error while adding labels:', error.message);
         }
