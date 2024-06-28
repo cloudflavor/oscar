@@ -47,6 +47,7 @@ function newCommandRegistry(): CommandRegistry {
 
     // Command handlers for issues and pull requests
     commandRegistry.registerCommand('/label', handleLabelCommand);
+    commandRegistry.registerCommand('/label-remove', handleLabelRemoveCommand);
     commandRegistry.registerCommand('/assign', handleAssigneesCommand);
     commandRegistry.registerCommand('/triage', handleTriageCommand);
     commandRegistry.registerCommand('/unassign', handleUnassigneesCommand);
@@ -93,6 +94,18 @@ async function handleLabelCommand(command: string, app: Octokit, payload: any): 
         });
         console.log(`Cleared all labels from issue #${payload.issue.number}`);
     }
+}
+
+async function handleLabelRemoveCommand(command: string, app: Octokit, payload: any): Promise<void> {
+    const match = command.match(/^\/label-remove(?:\s+(.*))?$/);
+    const label = match ? (match[1] || '').trim() : '';
+
+    await app.rest.issues.removeLabel({
+        owner: payload.repository.owner.login,
+        repo: payload.repository.name,
+        issue_number: payload.issue.number,
+        name: label,
+    });
 }
 
 async function handleTriageCommand(command: string, app: Octokit, payload: any): Promise<void> {
