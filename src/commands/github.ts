@@ -61,7 +61,7 @@ function newCommandRegistry(): CommandRegistry {
     commandRegistry.registerCommand('/reviewers', handleReviewersCommand);
     commandRegistry.registerCommand('/reopen', handleReopenCommand);
     commandRegistry.registerCommand('/merge', handlePrMergeCommand);
-    commandRegistry.registerCommand('/rename', handleRenameCommand);
+    commandRegistry.registerCommand('/retitle', handleRetitleCommand);
     commandRegistry.registerCommand('/hold', handlePrHoldCommand);
     commandRegistry.registerCommand('/unhold', handleUnholdCommand);
     commandRegistry.registerCommand('/draft', handlePrDraftCommand);
@@ -280,8 +280,8 @@ async function handleRestartWorkflowJobCommand(command: string, app: Octokit, pa
     }
 }
 
-async function handleRenameCommand(command: string, app: Octokit, payload: any): Promise<void> {
-    const match = command.match(/^\/rename(?:\s+(.*))?$/);
+async function handleRetitleCommand(command: string, app: Octokit, payload: any): Promise<void> {
+    const match = command.match(/^\/retitle(?:\s+(.*))?$/);
     const title = match ? (match[1] || '').trim() : '';
 
     if (title) {
@@ -292,7 +292,7 @@ async function handleRenameCommand(command: string, app: Octokit, payload: any):
             title,
         });
 
-        console.log(`Renamed issue #${payload.issue.number} to "${title}"`);
+        console.log(`Retitled issue #${payload.issue.number} to "${title}"`);
     } else {
         console.log(`No title specified in the command: ${command}`);
     }
