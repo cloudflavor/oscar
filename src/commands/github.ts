@@ -2,6 +2,7 @@ import { Octokit } from 'octokit';
 
 import { sleep } from '../common';
 
+
 class CommandRegistry {
     private handlers: { [key: string]: (command: string, app: Octokit, payload: any) => Promise<void>; } = {};
 
@@ -25,12 +26,16 @@ class CommandRegistry {
                 Object.keys(this.handlers).find(prefix => command.startsWith(prefix));
 
             if (commandPrefix) {
-                await this.handlers[commandPrefix](command, app, payload);
+                try {
+                    await this.handlers[commandPrefix](command, app, payload);
+                } catch (error: any) {
+                    console.error(`Error while processing command: ${command}`, error.message);
+                }
             } else {
                 console.log(`No handler found for command: ${command}`);
             }
 
-            await sleep(5000);
+            await sleep(1000);
         }
         return true;
     }
@@ -77,22 +82,25 @@ async function handleLabelCommand(command: string, app: Octokit, payload: any): 
     const labelsStr = match ? (match[1] || '').trim() : '';
     const labels = labelsStr ? labelsStr.split(' ').map(label => label.trim()) : [];
 
+
+    const issue_number = payload.issue?.number ? payload.issue.number : payload.pull_request?.number;
+
     if (labels.length > 0) {
         await app.rest.issues.addLabels({
             owner: payload.repository.owner.login,
             repo: payload.repository.name,
-            issue_number: payload.issue.number,
-            labels
+            issue_number,
+            labels,
         });
 
-        console.log(`Added labels "${labels.join(', ')}" to issue #${payload.issue.number}`);
+        console.log(`Added labels "${labels.join(', ')}" to issue #${issue_number}`);
     } else {
         await app.rest.issues.removeAllLabels({
             owner: payload.repository.owner.login,
             repo: payload.repository.name,
-            issue_number: payload.issue.number
+            issue_number,
         });
-        console.log(`Cleared all labels from issue #${payload.issue.number}`);
+        console.log(`Cleared all labels from issue #${issue_number}`);
     }
 }
 
@@ -100,32 +108,46 @@ async function handleLabelRemoveCommand(command: string, app: Octokit, payload: 
     const match = command.match(/^\/label-remove(?:\s+(.*))?$/);
     const label = match ? (match[1] || '').trim() : '';
 
+
+    const issue_number = payload.issue?.number ? payload.issue.number : payload.pull_request?.number;
+
     await app.rest.issues.removeLabel({
         owner: payload.repository.owner.login,
         repo: payload.repository.name,
-        issue_number: payload.issue.number,
+        issue_number,
         name: label,
     });
 }
 
 async function handleTriageCommand(command: string, app: Octokit, payload: any): Promise<void> {
+
+    const issue_number = payload.issue?.number ? payload.issue.number : payload.pull_request?.number;
+
     await app.rest.issues.removeLabel({
         owner: payload.repository.owner.login,
         repo: payload.repository.name,
-        issue_number: payload.issue.number,
+        issue_number,
         name: 'needs-triage',
     });
 
-    console.log(`Added "needs-triage" label to issue #${payload.issue.number}`);
+    await app.rest.issues.addLabels({
+        owner: payload.repository.owner.login,
+        repo: payload.repository.name,
+        issue_number,
+        labels: ['triage/accepted'],
+    });
+
+    console.log(`Added "needs-triage" label to issue #${issue_number}`);
 }
 
 async function handleRestartWorkflowCommand(command: string, app: Octokit, payload: any): Promise<void> {
     const actionId = command.slice('/restart-workflow'.length).trim();
+    const pullNumber = payload.issue?.number ? payload.issue.number : payload.pull_request?.number;
 
     const pullRequest = await app.rest.pulls.get({
         owner: payload.repository.owner.login,
         repo: payload.repository.name,
-        pull_number: payload.issue.number,
+        pull_number: pullNumber,
     });
 
     const actions = await app.rest.actions.listWorkflowRunsForRepo({
@@ -138,7 +160,7 @@ async function handleRestartWorkflowCommand(command: string, app: Octokit, paylo
 
     const lastAction = actions.data.workflow_runs[0];
     if (!lastAction) {
-        console.log(`No action found for the pull request #${payload.issue.number}`);
+        console.log(`No action found for the pull request #${pullNumber}`);
         return;
     }
     await app.rest.actions.reRunWorkflow({
@@ -150,18 +172,19 @@ async function handleRestartWorkflowCommand(command: string, app: Octokit, paylo
     await app.rest.issues.createComment({
         owner: payload.repository.owner.login,
         repo: payload.repository.name,
-        issue_number: payload.issue.number,
+        issue_number: pullNumber,
         body: `Restarted worflow: ["${lastAction.name}"](${lastAction.html_url})`,
     });
 }
 
 async function handleStopWorkflowCommand(command: string, app: Octokit, payload: any): Promise<void> {
     const actionId = command.slice('/stop-workflow'.length).trim();
+    const pullNumber = payload.issue?.number ? payload.issue.number : payload.pull_request?.number;
 
     const pullRequest = await app.rest.pulls.get({
         owner: payload.repository.owner.login,
         repo: payload.repository.name,
-        pull_number: payload.issue.number,
+        pull_number: pullNumber,
     });
 
     const actions = await app.rest.actions.listWorkflowRunsForRepo({
@@ -186,7 +209,7 @@ async function handleStopWorkflowCommand(command: string, app: Octokit, payload:
     await app.rest.issues.createComment({
         owner: payload.repository.owner.login,
         repo: payload.repository.name,
-        issue_number: payload.issue.number,
+        issue_number: pullNumber,
         body: `Stopped worflow: ["${lastAction.name}"](${lastAction.html_url})`,
     });
 }
@@ -194,11 +217,12 @@ async function handleStopWorkflowCommand(command: string, app: Octokit, payload:
 
 async function handleCancelWorkflowCommand(command: string, app: Octokit, payload: any): Promise<void> {
     const actionId = command.slice('/cancel-workflow'.length).trim();
+    const pullNumber = payload.issue?.number ? payload.issue.number : payload.pull_request?.number;
 
     const pullRequest = await app.rest.pulls.get({
         owner: payload.repository.owner.login,
         repo: payload.repository.name,
-        pull_number: payload.issue.number,
+        pull_number: pullNumber,
     });
 
     const actions = await app.rest.actions.listWorkflowRunsForRepo({
@@ -224,7 +248,7 @@ async function handleCancelWorkflowCommand(command: string, app: Octokit, payloa
     await app.rest.issues.createComment({
         owner: payload.repository.owner.login,
         repo: payload.repository.name,
-        issue_number: payload.issue.number,
+        issue_number: pullNumber,
         body: `Force canceled workflow: ["${lastAction.name}"](${lastAction.html_url})`,
     });
 }
@@ -234,12 +258,13 @@ async function handleRestartWorkflowJobCommand(command: string, app: Octokit, pa
     const match = command.match(/^\/restart-job(?:\s+(.*))?$/);
     const jobCommand = match ? (match[1] || '').trim() : '';
     const [workflowName, jobName] = jobCommand.split(' ');
+    const pullNumber = payload.issue?.number ? payload.issue.number : payload.pull_request?.number;
 
     if (jobName) {
         const pullRequest = await app.rest.pulls.get({
             owner: payload.repository.owner.login,
             repo: payload.repository.name,
-            pull_number: payload.issue.number,
+            pull_number: pullNumber,
         });
 
         const workflow = await app.rest.actions.listWorkflowRunsForRepo({
@@ -259,7 +284,7 @@ async function handleRestartWorkflowJobCommand(command: string, app: Octokit, pa
         const job = jobs.data.jobs.find(j => j.name === jobName);
 
         if (!job) {
-            console.log(`No job found for the pull request #${payload.issue.number}`);
+            console.log(`No job found for the pull request #${pullNumber}`);
             return;
         }
 
@@ -272,7 +297,7 @@ async function handleRestartWorkflowJobCommand(command: string, app: Octokit, pa
         await app.rest.issues.createComment({
             owner: payload.repository.owner.login,
             repo: payload.repository.name,
-            issue_number: payload.issue.number,
+            issue_number: pullNumber,
             body: `Restarted job: ${job.name} for workflow: ${workflowName}`,
         });
     } else {
@@ -283,12 +308,13 @@ async function handleRestartWorkflowJobCommand(command: string, app: Octokit, pa
 async function handleRetitleCommand(command: string, app: Octokit, payload: any): Promise<void> {
     const match = command.match(/^\/retitle(?:\s+(.*))?$/);
     const title = match ? (match[1] || '').trim() : '';
+    const issueNumber = payload.issue?.number ? payload.issue.number : payload.pull_request?.number;
 
     if (title) {
         await app.rest.issues.update({
             owner: payload.repository.owner.login,
             repo: payload.repository.name,
-            issue_number: payload.issue.number,
+            issue_number: issueNumber,
             title,
         });
 
@@ -306,68 +332,80 @@ async function handleAssigneesCommand(command: string, app: Octokit, payload: an
         const assigneesStr = match ? match[1].trim() : '';
         assignees = assigneesStr ? assigneesStr.split(' ').map(assignee => assignee.trim().replace(/^@/, '')) : [];
     } else {
-        assignees = [payload.comment.user.login];
+        assignees = [payload.sender.login];
     }
 
-    await app.rest.issues.addAssignees({
-        owner: payload.repository.owner.login,
-        repo: payload.repository.name,
-        issue_number: payload.issue.number,
-        assignees,
-    });
+    const issueNumber = payload.issue?.number ? payload.issue.number : payload.pull_request?.number;
 
-    console.log(`Assigning issue #${payload.issue.number} to ${assignees.join(', ')}`);
+    try {
+        await app.rest.issues.addAssignees({
+            owner: payload.repository.owner.login,
+            repo: payload.repository.name,
+            issue_number: issueNumber,
+            assignees,
+        });
+    } catch (error: any) {
+        console.log(`Failed to assign issue #${issueNumber} to ${assignees.join(', ')} due to: ${error.message}`);
+    }
+
+    console.log(`Assigning issue #${issueNumber} to ${assignees.join(', ')}`);
 }
 
 async function handleUnassigneesCommand(command: string, app: Octokit, payload: any) {
     const user = payload.comment.user.login;
+    const issueNumber = payload.issue?.number ? payload.issue.number : payload.pull_request?.number;
 
     await app.rest.issues.removeAssignees({
         owner: payload.repository.owner.login,
         repo: payload.repository.name,
-        issue_number: payload.issue.number,
+        issue_number: issueNumber,
         assignees: [user],
     });
 
-    console.log(`Unassigned issue #${payload.issue.number} from ${user}`);
+    console.log(`Unassigned issue #${issueNumber} from ${user}`);
 }
 
 async function handleReopenCommand(command: string, app: Octokit, payload: any) {
+    const issueNumber = payload.issue?.number ? payload.issue.number : payload.pull_request?.number;
+
     await app.rest.issues.update({
         owner: payload.repository.owner.login,
         repo: payload.repository.name,
-        issue_number: payload.issue.number,
+        issue_number: issueNumber,
         state: 'open',
     });
 
-    console.log(`Reopened issue #${payload.issue.number}`);
+    console.log(`Reopened issue #${issueNumber}`);
 }
 
 async function handleCloseCommand(command: string, app: Octokit, payload: any) {
+    const issueNumber = payload.issue?.number ? payload.issue.number : payload.pull_request?.number;
     await app.rest.issues.update({
         owner: payload.repository.owner.login,
         repo: payload.repository.name,
-        issue_number: payload.issue.number,
+        issue_number: issueNumber,
         state: 'closed',
     });
 
-    console.log(`Closed issue #${payload.issue.number}`);
+    console.log(`Closed issue #${issueNumber}`);
 }
 
 async function handlePrHoldCommand(command: string, app: Octokit, payload: any) {
+    const issueNumber = payload.issue?.number ? payload.issue.number : payload.pull_request?.number;
     await app.rest.issues.addLabels({
         owner: payload.repository.owner.login,
         repo: payload.repository.name,
-        issue_number: payload.issue.number,
+        issue_number: issueNumber,
         labels: ['do-not-merge'],
     });
 }
 
 async function handleUnholdCommand(command: string, app: Octokit, payload: any) {
+    const issueNumber = payload.issue?.number ? payload.issue.number : payload.pull_request?.number;
     await app.rest.issues.removeLabel({
         owner: payload.repository.owner.login,
         repo: payload.repository.name,
-        issue_number: payload.issue.number,
+        issue_number: issueNumber,
         name: 'do-not-merge',
     });
 }
@@ -376,22 +414,23 @@ async function handleUnholdCommand(command: string, app: Octokit, payload: any) 
 async function handlePrMergeCommand(command: string, app: Octokit, payload: any) {
     const match = command.match(/^\/merge(?:\s+(.*))?$/);
     const override = match?.[1]?.trim() || '';
+    const issueNumber = payload.issue?.number ? payload.issue.number : payload.pull_request?.number;
 
     // TODO: Force should only be allowed for specific users, admins more specifically.
     if (override === 'force') {
-        console.log(`Force merging pull request #${payload.issue.number}`);
+        console.log(`Force merging pull request #${issueNumber}`);
 
         await app.rest.issues.createComment({
             owner: payload.repository.owner.login,
             repo: payload.repository.name,
-            issue_number: payload.issue.number,
+            issue_number: issueNumber,
             body: 'Force merging pull request',
         });
 
         await app.rest.pulls.merge({
             owner: payload.repository.owner.login,
             repo: payload.repository.name,
-            pull_number: payload.issue.number,
+            pull_number: issueNumber,
         });
         return;
     }
@@ -399,26 +438,26 @@ async function handlePrMergeCommand(command: string, app: Octokit, payload: any)
     const labels = await app.rest.issues.listLabelsOnIssue({
         owner: payload.repository.owner.login,
         repo: payload.repository.name,
-        issue_number: payload.issue.number,
+        issue_number: issueNumber,
     });
 
     if (labels.data.some(label => label.name === 'do-not-merge')) {
-        console.log(`Skipping merge for pull request #${payload.issue.number} due to "do-not-merge" label`);
+        console.log(`Skipping merge for pull request #${issueNumber} due to "do-not-merge" label`);
         await app.rest.issues.createComment({
             owner: payload.repository.owner.login,
             repo: payload.repository.name,
-            issue_number: payload.issue.number,
+            issue_number: issueNumber,
             body: 'Skipping merge due to "do-not-merge" label',
         });
         return;
     }
 
-    if (labels.data.some(label => label.name !== 'approved')) {
-        console.log(`Skipping merge for pull request #${payload.issue.number} due to missing "approved" label`);
+    if (!labels.data.some(label => label.name === 'approved')) {
+        console.log(`Skipping merge for pull request #${issueNumber} due to missing "approved" label`);
         await app.rest.issues.createComment({
             owner: payload.repository.owner.login,
             repo: payload.repository.name,
-            issue_number: payload.issue.number,
+            issue_number: issueNumber,
             body: 'Skipping merge due to missing "approved" label',
         });
         return;
@@ -427,7 +466,7 @@ async function handlePrMergeCommand(command: string, app: Octokit, payload: any)
     const pullRequest = await app.rest.pulls.get({
         owner: payload.repository.owner.login,
         repo: payload.repository.name,
-        pull_number: payload.issue.number,
+        pull_number: issueNumber,
     });
 
     if (pullRequest.data.merged) {
@@ -435,7 +474,7 @@ async function handlePrMergeCommand(command: string, app: Octokit, payload: any)
         await app.rest.issues.createComment({
             owner: payload.repository.owner.login,
             repo: payload.repository.name,
-            issue_number: payload.issue.number,
+            issue_number: issueNumber,
             body: 'Skipping merge due to already merged',
         });
         return;
@@ -454,21 +493,21 @@ async function handlePrMergeCommand(command: string, app: Octokit, payload: any)
             case 'requested':
             case 'waiting':
             case 'in_progress':
-                console.log(`Skipping merge for pull request #${payload.issue.number} due to pending checks`);
+                console.log(`Skipping merge for pull request #${issueNumber} due to pending checks`);
                 await app.rest.issues.createComment({
                     owner: payload.repository.owner.login,
                     repo: payload.repository.name,
-                    issue_number: payload.issue.number,
+                    issue_number: issueNumber,
                     body: 'Skipping merge due to pending checks',
                 });
                 return;
             case 'completed':
                 if (job.conclusion === 'failure') {
-                    console.log(`Skipping merge for pull request #${payload.issue.number} due to failed checks`);
+                    console.log(`Skipping merge for pull request #${issueNumber} due to failed checks`);
                     await app.rest.issues.createComment({
                         owner: payload.repository.owner.login,
                         repo: payload.repository.name,
-                        issue_number: payload.issue.number,
+                        issue_number: issueNumber,
                         body: 'Merge not possible due to failed checks',
                     });
                     return;
@@ -478,22 +517,22 @@ async function handlePrMergeCommand(command: string, app: Octokit, payload: any)
     }
 
     if (pullRequest.data.draft) {
-        console.log(`Skipping merge for pull request #${payload.issue.number} due to draft status`);
+        console.log(`Skipping merge for pull request #${issueNumber} due to draft status`);
         await app.rest.issues.createComment({
             owner: payload.repository.owner.login,
             repo: payload.repository.name,
-            issue_number: payload.issue.number,
+            issue_number: issueNumber,
             body: 'Skipping merge due to draft status',
         });
         return;
     }
 
     if (pullRequest.data.mergeable === false) {
-        console.log(`Skipping merge for pull request #${payload.issue.number} due to conflicts`);
+        console.log(`Skipping merge for pull request #${issueNumber} due to conflicts`);
         await app.rest.issues.createComment({
             owner: payload.repository.owner.login,
             repo: payload.repository.name,
-            issue_number: payload.issue.number,
+            issue_number: issueNumber,
             body: 'Skipping merge due to conflicts',
         });
         return;
@@ -502,17 +541,18 @@ async function handlePrMergeCommand(command: string, app: Octokit, payload: any)
     await app.rest.pulls.merge({
         owner: payload.repository.owner.login,
         repo: payload.repository.name,
-        pull_number: payload.issue.number,
+        pull_number: issueNumber,
     });
 
-    console.log(`Merged pull request #${payload.issue.number}`);
+    console.log(`Merged pull request #${issueNumber}`);
 }
 
 async function handlePrDraftCommand(command: string, app: Octokit, payload: any) {
+    const pullNumber = payload.issue?.number ? payload.issue.number : payload.pull_request?.number;
     await app.rest.pulls.update({
         owner: payload.repository.owner.login,
         repo: payload.repository.name,
-        pull_number: payload.issue.number,
+        pull_number: pullNumber,
         draft: true,
     });
 
@@ -520,64 +560,69 @@ async function handlePrDraftCommand(command: string, app: Octokit, payload: any)
 }
 
 async function handlePrApproveCommand(command: string, app: Octokit, payload: any) {
+    const issueNumber = payload.issue?.number ? payload.issue.number : payload.pull_request?.number;
     await app.rest.issues.addLabels({
         owner: payload.repository.owner.login,
         repo: payload.repository.name,
-        issue_number: payload.issue.number,
+        issue_number: issueNumber,
         labels: ['approved'],
     });
 
-    console.log(`Approved pull request #${payload.issue.number}`);
+    console.log(`Approved pull request #${issueNumber}`);
 }
 
 async function handlePrUnapproveCommand(command: string, app: Octokit, payload: any) {
+    const pullNumber = payload.issue?.number ? payload.issue.number : payload.pull_request?.number;
     await app.rest.pulls.createReview({
         owner: payload.repository.owner.login,
         repo: payload.repository.name,
-        pull_number: payload.issue.number,
+        pull_number: pullNumber,
     });
 
     await app.rest.issues.removeLabel({
         owner: payload.repository.owner.login,
         repo: payload.repository.name,
-        issue_number: payload.issue.number,
+        issue_number: pullNumber,
         name: 'approved',
     });
 
-    console.log(`Unapproved pull request #${payload.issue.number}`);
+    console.log(`Unapproved pull request #${pullNumber}`);
 }
 
 async function handleIssueLockCommand(command: string, app: Octokit, payload: any): Promise<void> {
     // TODO: should be limited to admins
+    const issueNumber = payload.issue?.number ? payload.issue.number : payload.pull_request?.number;
     await app.rest.issues.lock({
         owner: payload.repository.owner.login,
         repo: payload.repository.name,
-        issue_number: payload.issue.number,
+        issue_number: issueNumber,
     });
 
-    console.log(`Locked issue #${payload.issue.number}`);
+    console.log(`Locked issue #${issueNumber}`);
 }
 
 async function handleIssueUnlockCommand(command: string, app: Octokit, payload: any): Promise<void> {
+    const issueNumber = payload.issue?.number ? payload.issue.number : payload.pull_request?.number;
     // TODO: should be limited to admins
     await app.rest.issues.unlock({
         owner: payload.repository.owner.login,
         repo: payload.repository.name,
-        issue_number: payload.issue.number,
+        issue_number: issueNumber,
     });
 
-    console.log(`Unlocked issue #${payload.issue.number}`);
+    console.log(`Unlocked issue #${issueNumber}`);
 }
 
 async function handleMilestoneCommand(command: string, app: Octokit, payload: any): Promise<void> {
     const match = command.match(/^\/milestone(?:\s+(.*))?$/);
     const milestone = match ? (match[1] || '').trim() : '';
+    const issueNumber = payload.issue?.number ? payload.issue.number : payload.pull_request?.number;
 
     if (milestone === 'clear') {
         await app.rest.issues.update({
             owner: payload.repository.owner.login,
             repo: payload.repository.name,
-            issue_number: payload.issue.number,
+            issue_number: issueNumber,
             milestone: null,
         });
 
@@ -597,7 +642,7 @@ async function handleMilestoneCommand(command: string, app: Octokit, payload: an
             return;
         }
 
-        console.log(`Set milestone for issue #${payload.issue.number} to ${milestone}`);
+        console.log(`Set milestone for issue #${issueNumber} to ${milestone}`);
     } else {
         console.log(`No milestone specified in the command: ${command}`);
     }
@@ -647,15 +692,16 @@ async function handleReviewersCommand(command: string, app: Octokit, payload: an
     const match = command.match(/^\/reviewers(?:\s+(.*))?$/);
     const reviewersStr = match ? match[1].trim() : '';
     const reviewers = reviewersStr ? reviewersStr.split(' ').map(reviewer => reviewer.trim().replace(/^@/, '')) : [];
+    const issueNumber = payload.issue?.number ? payload.issue.number : payload.pull_request?.number;
 
     await app.rest.pulls.requestReviewers({
         owner: payload.repository.owner.login,
         repo: payload.repository.name,
-        pull_number: payload.issue.number,
+        pull_number: issueNumber,
         reviewers,
     });
 
-    console.log(`Request review for pull request #${payload.issue.number} from ${reviewers.join(', ')}`);
+    console.log(`Request review for pull request #${issueNumber} from ${reviewers.join(', ')}`);
 }
 
 export { newCommandRegistry };
