@@ -9,9 +9,7 @@ export type Env = {
     GITHUB_PRIVATE_KEY: string;
 
     OSCAR_ACCESS_CONFIG_URI: string;
-
     OSCAR_RATE_LIMITER: any;
-
     OSCAR_PERMISSIONS_CONFIG: Config;
 };
 

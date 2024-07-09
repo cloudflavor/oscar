@@ -20,7 +20,7 @@ export default async (env: Env, installationId: number): Promise<App> => {
     try {
         authApp = await app.getInstallationOctokit(installationId);
     } catch (error: any) {
-        console.error('Error while authenticating:', error.message);
+        console.error(`Error while authenticating: ${error.message}`);
     }
 
     const commandRegistry = newCommandRegistry();
@@ -34,7 +34,7 @@ export default async (env: Env, installationId: number): Promise<App> => {
         }
         config = resp;
     } catch (error: any) {
-        console.error('Error while parsing the config file:', error.message);
+        console.error(`Error while parsing the config file: ${error.message}`);
     }
 
 
@@ -48,6 +48,13 @@ export default async (env: Env, installationId: number): Promise<App> => {
                 ['needs-triage'],
             );
 
+            if (payload.issue.body) {
+                await commandRegistry.processCommand(
+                    payload.issue.body,
+                    authApp,
+                    payload,
+                );
+            }
 
             await authApp.rest.reactions.createForIssue({
                 owner: payload.repository.owner.login,
@@ -56,7 +63,7 @@ export default async (env: Env, installationId: number): Promise<App> => {
                 content: 'eyes',
             });
         } catch (error: any) {
-            console.error('Error while adding labels:', error.message);
+            console.error(`Error while executing commands for issues.opened: ${error.message}`);
         }
     });
 
@@ -72,16 +79,23 @@ export default async (env: Env, installationId: number): Promise<App> => {
 
             const reactions: ReactionContent[] = ['+1', 'rocket', 'heart'];
 
-            for (const content of reactions) {
-                await authApp.rest.reactions.createForIssueComment({
+            for (const reaction of reactions) {
+                await authApp.rest.reactions.createForIssue({
                     owner: payload.repository.owner.login,
                     repo: payload.repository.name,
-                    comment_id: payload.pull_request.id,
-                    content,
+                    issue_number: payload.pull_request.number,
+                    content: reaction,
                 });
             }
+            if (payload.pull_request.body) {
+                await commandRegistry.processCommand(
+                    payload.pull_request.body,
+                    authApp,
+                    payload,
+                );
+            }
         } catch (error: any) {
-            console.error('Error while adding labels:', error.message);
+            console.error(`Error while executing commands for pull_request.opened: ${error.message}`);
         }
     });
 
@@ -104,7 +118,7 @@ export default async (env: Env, installationId: number): Promise<App> => {
                 payload,
             );
         } catch (error: any) {
-            console.error('Error while processing command on issue_comment:', error.message);
+            console.error(`Error while processing command on issue_comment: ${error.message}`);
         }
     };
 
@@ -138,7 +152,7 @@ export default async (env: Env, installationId: number): Promise<App> => {
                 });
                 await addLabels(authApp, owner, repo, resp.data.number, ['ci-failure']);
             } catch (error: any) {
-                console.error('Error while creating issue:', error.message);
+                console.error(`Error while creating issue: ${error.message}`);
             }
         }
     });
