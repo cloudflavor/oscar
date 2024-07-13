@@ -642,6 +642,12 @@ async function handleMilestoneCommand(command: string, app: Octokit, payload: an
             return;
         }
 
+        await app.rest.issues.update({
+            owner: payload.repository.owner.login,
+            repo: payload.repository.name,
+            issue_number: issueNumber,
+            milestone: milestoneId,
+        });
         console.log(`Set milestone for issue #${issueNumber} to ${milestone}`);
     } else {
         console.log(`No milestone specified in the command: ${command}`);
