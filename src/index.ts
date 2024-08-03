@@ -18,20 +18,12 @@ export default {
 			return new Response(`429 Failure – rate limit exceeded for ${pathname}`, { status: 429 });
 		}
 
-		const source = request.headers.get('X-GitHub-Event') ? 'github' :
-			request.headers.get('X-Gitlab-Event') ? 'gitlab' :
-				request.headers.get('X-Gitea-Event') ? 'gitea' : 'unknown';
+		const source = request.headers.get('X-GitHub-Event') ? 'github' : 'unknown';
 
 		switch (source) {
 			case 'github':
 				console.log('Request is from GitHub');
 				break;
-			case 'gitlab':
-				console.log('Request is from GitLab');
-				return new Response('Not implemented', { status: 501, headers: { 'Content-Type': 'application/json' } });
-			case 'gitea':
-				console.log('Request is from Gitea');
-				return new Response('Not implemented', { status: 501, headers: { 'Content-Type': 'application/json' } });
 			default:
 				console.log('Unknown source');
 				return new Response('Unsupported webhook', { status: 400 });
