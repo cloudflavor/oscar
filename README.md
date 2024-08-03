@@ -18,6 +18,7 @@ as:
 - `/close`: Closes the PR or Issue.
 - `/reopen`: Reopens the PR or Issue.
 - `/label`: Adds a label to the PR or Issue.
+- '/label-remove': Removes a label from the PR or Issue.
 - `/triage`: Remove the `needs-triage` label from the PR or Issue.
 - `/rename`: Renames the PR or Issue.
 - `/reviewers`: Adds reviewers to the PR.
@@ -33,7 +34,6 @@ as:
 
 Oscar can be run as a GitHub app. This is the recommended way to run Oscar as it is
 easier to set up and maintain.
-Integrating with GitLab and Gitea is planned for the near future.
 
 ## Cloudflare workers
 
