@@ -1,5 +1,8 @@
 # oscar
 
+NOTE: This project is in development, is not a priority and values functionality above
+anything else, and as such it's not high quality code. 
+
 Oscar is a bot inspired by [Prow](https://docs.prow.k8s.io/docs/).
 And just like Prow, Oscar is a bot that helps you manage your GitHub repositories.
 It can answer to commands in the comments of your PRs and Issues such
