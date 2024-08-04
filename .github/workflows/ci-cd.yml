@@ -1,19 +1,14 @@
 name: Deploy to Cloudflare Workers
-
 on:
   push:
     branches: [ main ]
-  pull_request:
-    branches: [ main ]
-
+  workflow_dispatch:
 jobs:
   test:
     runs-on: ubuntu-latest
-
     strategy:
       matrix:
         node-version: [21.x, 22.x]
-
     steps:
     - uses: actions/checkout@v2
     - name: Set up Node.js ${{ matrix.node-version }}
