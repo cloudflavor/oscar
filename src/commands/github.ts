@@ -70,6 +70,7 @@ function newCommandRegistry(): CommandRegistry {
     commandRegistry.registerCommand('/hold', handlePrHoldCommand);
     commandRegistry.registerCommand('/unhold', handleUnholdCommand);
     commandRegistry.registerCommand('/draft', handlePrDraftCommand);
+    commandRegistry.registerCommand('/ready', handlePrReadyCommand);
     commandRegistry.registerCommand('/approve', handlePrApproveCommand);
     commandRegistry.registerCommand('/unapprove', handlePrUnapproveCommand);
 
@@ -557,6 +558,18 @@ async function handlePrDraftCommand(command: string, app: Octokit, payload: any)
     });
 
     console.log(`Marked pull request #${payload.issue.number} as draft`);
+}
+
+async function handlePrReadyCommand(command: string, app: Octokit, payload: any) {
+    const pullNumber = payload.issue?.number ? payload.issue.number : payload.pull_request?.number;
+    await app.rest.pulls.update({
+        owner: payload.repository.owner.login,
+        repo: payload.repository.name,
+        pull_number: pullNumber,
+        draft: false,
+    });
+
+    console.log(`Marked pull request #${pullNumber} as ready for review`);
 }
 
 async function handlePrApproveCommand(command: string, app: Octokit, payload: any) {
