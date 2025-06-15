@@ -1,7 +1,7 @@
 # oscar
 
 NOTE: This project is in development, is not a priority and values functionality above
-anything else, and as such it's not high quality code. 
+anything else.
 
 Oscar is a bot inspired by [Prow](https://docs.prow.k8s.io/docs/).
 And just like Prow, Oscar is a bot that helps you manage your GitHub repositories.
@@ -40,5 +40,5 @@ easier to set up and maintain.
 Oscar's advantage is that it can be deployed and used for free on cloudflare workers. The
 free tier of cloudflare workers is enough to run Oscar for most repositories (100k
 requests/day).
-And in extreme cases, you can always pay for the pro plan or enable load balancing to 
+And in extreme cases, you can always pay for the pro plan or enable load balancing to
 spread requests across multiple workers.
